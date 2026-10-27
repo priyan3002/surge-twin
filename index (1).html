@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hospital Resource Management – Surge Twin</title>
+<style>
+:root{--bg:#f2f7f8;--cd:#fff;--tx:#10303a;--mu:#587480;--ac:#0b7f86;--ok:#1b8a4b;--bad:#c4402f;--wa:#b87a06;--bd:#d3e2e6;--tr:#e3eef0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c1a1f;--cd:#14262d;--tx:#e3f0f3;--mu:#8da8b1;--ac:#3cc5cb;--ok:#4cc784;--bad:#f08a78;--wa:#e5b24a;--bd:#27414b;--tr:#1f343c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1a1f;--cd:#14262d;--tx:#e3f0f3;--mu:#8da8b1;--ac:#3cc5cb;--ok:#4cc784;--bad:#f08a78;--wa:#e5b24a;--bd:#27414b;--tr:#1f343c;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+h1{font:600 26px/1.2 Georgia,"Times New Roman",serif;margin:0 0 4px}
+h2{font:600 17px/1.3 Georgia,serif;margin:0 0 10px}
+.sub{color:var(--mu);margin:0 0 16px;max-width:70ch}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--cd);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+button{font:inherit;border:1px solid var(--bd);background:var(--cd);color:var(--tx);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+button.d{border-color:var(--bad);color:var(--bad)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.g{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));margin-bottom:14px}
+.c{background:var(--cd);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;min-width:0}
+.row{margin:8px 0}.row .l{display:flex;justify-content:space-between;font-size:13px;color:var(--mu)}
+.trk{height:10px;background:var(--tr);border-radius:6px;overflow:hidden;margin-top:3px}
+.trk i{display:block;height:100%;background:var(--ac)}
+.trk i.w{background:var(--wa)}.trk i.r{background:var(--bad)}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;border:1px solid currentColor}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.wa{color:var(--wa)}
+.ag{margin:0;padding:0;list-style:none}.ag li{padding:7px 0;border-top:1px solid var(--bd);font-size:14px}.ag li:first-child{border:0}
+.ag b{display:inline-block;min-width:92px}
+.plans{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(290px,100%),1fr))}
+.pl.rec{border:2px solid var(--ac)}
+.pl ul{margin:6px 0;padding-left:18px;font-size:14px}
+.met{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:10px 0;text-align:center}
+.met div{background:var(--tr);border-radius:8px;padding:6px 2px;font-size:12px;color:var(--mu)}
+.met b{display:block;font-size:18px;color:var(--tx)}
+.chk{font-size:13px;margin:2px 0}
+#log{max-height:200px;overflow:auto;font-size:13px;color:var(--mu)}#log div{padding:3px 0;border-top:1px solid var(--bd)}
+svg{width:100%;height:auto;display:block}
+.wide{overflow-x:auto}
+label{font-size:14px;color:var(--mu)}
+</style></head><body><main>
+<h1>Hospital Resource Management</h1>
+<p class="sub">Specialist agents watch beds, nurses and equipment. When demand jumps, a coordinator drafts three plans, a digital twin replays each over the next six hours, a safety verifier blocks unsafe ones, and a person approves. The system never touches clinical decisions.</p>
+<div class="bar">
+<button id="nx" class="p">Advance one hour</button>
+<label><input type="checkbox" id="rise"> Demand rising</label>
+<span style="flex:1"></span>
+<label for="sz">Surge size <b id="szv">15</b></label>
+<input type="range" id="sz" min="12" max="25" value="15">
+<button id="sg" class="d">Trigger ED surge</button>
+<button id="rs">Reset</button>
+</div>
+<div class="g">
+<section class="c"><h2 id="clk">Resources</h2><div id="res"></div></section>
+<section class="c"><h2>Arrivals and forecast</h2><div id="fcs"></div><p id="det" style="margin:6px 0 0"></p></section>
+<section class="c"><h2>Agent reports</h2><ul class="ag" id="ag"></ul></section>
+</div>
+<section class="c" style="margin-bottom:14px">
+<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between"><h2 style="margin:0">Reallocation plans</h2><button id="gp" class="p">Draft plans</button></div>
+<p class="sub" style="margin:6px 0 12px">The twin ranks plans by projected ED boarding and nurse strain. The verifier checks staffing ratios and reserve beds first, so only a safe plan can be approved.</p>
+<div class="plans" id="pls"><p class="sub">No plans yet. Trigger a surge or draft plans to begin.</p></div></section>
+<section class="c"><h2>Audit trail and notifications</h2><div id="log"></div></section>
+</main>
+<script>
+const R={ed:4,icu:2,ward:6},$=id=>document.getElementById(id),RES=3;
+const init=()=>({h:8,ed:{cap:20,occ:12},icu:{cap:8,occ:5},ward:{cap:40,occ:28},n:{ed:4,icu:3,ward:5},fl:4,vent:{t:10,u:5},or:{t:3,u:1},arr:[3,4,3,4,4],plans:[],log:[]});
+let S=init();
+const req=(u,o)=>Math.ceil(o/R[u]);
+const tm=h=>String(h%24).padStart(2,"0")+":00";
+function fc(a,k){let l=a[0],t=0;for(let i=1;i<a.length;i++){const p=l;l=.6*a[i]+.4*(l+t);t=.4*(l-p)+.6*t}
+return Array.from({length:k},(_,i)=>Math.max(2,4+(l+t*.5-4)*Math.pow(.65,i+1)))}
+function getStatus(){const a=S.arr,last=a[a.length-1],f=fc(a,6);
+if(last>=12)return{s:"Surge",c:"bad",f,m:"Arrivals hit "+last+" last hour."};
+if(f[0]>=7)return{s:"Predicted surge",c:"wa",f,m:"Forecast "+f[0].toFixed(1)+" arrivals next hour. Plans can start before the peak."};
+return{s:"Normal",c:"ok",f,m:"Forecast "+f[0].toFixed(1)+" arrivals next hour."}}
+function log(t){S.log.unshift(tm(S.h)+"  "+t)}
+function draft(){const ex=Math.max(0,S.ed.occ-(S.ed.cap-4));if(!ex){S.plans=[];log("Coordinator: no ED overflow, so no plans needed.");render();return}
+S.plans=[["Conservative",.5],["Balanced",.8],["Aggressive",1.2]].map(([nm,k])=>{
+const adm=Math.round(ex*k),dis=Math.round(adm*.3),edA=S.ed.occ-adm,wdA=S.ward.occ+adm-dis;
+const rE=req("ed",Math.min(edA,S.ed.cap)),rW=req("ward",wdA);
+const fE=Math.min(S.fl,Math.max(0,rE-S.n.ed)),fW=Math.min(S.fl-fE,Math.max(0,rW-S.n.ward));
+const free=S.ward.cap-wdA,ck=[
+["ED nurse ratio 1:4",S.n.ed+fE>=rE,(S.n.ed+fE)+" nurses, need "+rE],
+["Ward nurse ratio 1:6",S.n.ward+fW>=rW,(S.n.ward+fW)+" nurses, need "+rW],
+["Ward reserve of 4 beds",free>=4,free+" beds free"],
+["Ventilator reserve of 2",S.vent.t-S.vent.u>=2,(S.vent.t-S.vent.u)+" free"]];
+let e=edA,svc=5+1.5*fE,w=[Math.max(0,e-S.ed.cap)];
+fc(S.arr,6).forEach(a=>{e=Math.max(0,e+a-svc);w.push(Math.max(0,e-S.ed.cap))});
+const avg=w.reduce((x,y)=>x+y,0)/w.length,peak=Math.max(...w),used=fE+fW;
+const load=Math.max(rE/(S.n.ed+fE),rW/(S.n.ward+fW),1);
+const fat=Math.min(100,Math.round(60*used/4+40*Math.min(load,1.5)/1.5));
+return{nm,adm,dis,fE,fW,ck,safe:ck.every(c=>c[1]),avg,peak,fat,sc:peak*4+avg*3+fat*.15,w,done:false}});
+const ok=S.plans.filter(p=>p.safe).sort((a,b)=>a.sc-b.sc);if(ok[0])ok[0].rec=true;
+log("Coordinator drafted 3 plans. Verifier passed "+ok.length+" of 3.");render()}
+function apply(i){const p=S.plans[i];if(!p.safe)return;
+S.ed.occ-=p.adm;S.ward.occ+=p.adm-p.dis;S.n.ed+=p.fE;S.n.ward+=p.fW;S.fl-=p.fE+p.fW;
+log("Approved by duty manager: "+p.nm+" plan.");
+log("Bed board updated: "+p.adm+" ED patients moved to ward, "+p.dis+" early discharges.");
+log("Pager sent to "+(p.fE+p.fW)+" float nurses ("+p.fE+" to ED, "+p.fW+" to ward).");
+S.plans=[];render()}
+const bar=(l,o,c,x)=>{const r=o/c;return`<div class="row"><div class="l"><span>${l}</span><span>${o}/${c}${x||""}</span></div><div class="trk"><i class="${r>1?"r":r>.85?"w":""}" style="width:${Math.min(100,r*100)}%"></i></div></div>`};
+function render(){const st=getStatus(),ed=S.ed,wait=Math.max(0,ed.occ-ed.cap);
+$("clk").textContent="Resources at "+tm(S.h);
+$("res").innerHTML=bar("Emergency beds",Math.min(ed.occ,ed.cap),ed.cap,wait?" +"+wait+" boarding":"")+bar("ICU beds",S.icu.occ,S.icu.cap)+bar("Ward beds",S.ward.occ,S.ward.cap)+bar("Ventilators",S.vent.u,S.vent.t)+bar("Operating rooms",S.or.u,S.or.t)+
+`<div class="row"><div class="l"><span>Nurses ED / ICU / Ward</span><span>${S.n.ed} / ${S.n.icu} / ${S.n.ward}</span></div><div class="l"><span>Float pool available</span><span>${S.fl}</span></div></div>`;
+const a=S.arr.slice(-8),f=st.f,all=a.concat(f),mx=Math.max(14,...all),W=320,H=130,x=i=>20+i*(W-30)/(all.length-1),y=v=>H-18-v/mx*(H-30);
+const pts=(arr,o)=>arr.map((v,i)=>x(i+o)+","+y(v)).join(" ");
+$("fcs").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly arrivals with six-hour forecast"><line x1="20" x2="${W-10}" y1="${y(12)}" y2="${y(12)}" stroke="var(--bad)" stroke-dasharray="3 4" opacity=".6"/><text x="22" y="${y(12)-3}" font-size="9" fill="var(--bad)">surge line</text><polyline points="${pts(a,0)}" fill="none" stroke="var(--ac)" stroke-width="2.5"/><polyline points="${x(a.length-1)+","+y(a[a.length-1])+" "+pts(f,a.length)}" fill="none" stroke="var(--wa)" stroke-width="2.5" stroke-dasharray="5 4"/><text x="20" y="${H-3}" font-size="10" fill="var(--mu)">past hours</text><text x="${W-90}" y="${H-3}" font-size="10" fill="var(--wa)">forecast, 6 hours</text></svg>`;
+$("det").innerHTML=`<span class="badge ${st.c}">${st.s}</span> ${st.m}`;
+const rE=req("ed",Math.min(ed.occ,ed.cap)),rW=req("ward",S.ward.occ);
+$("ag").innerHTML=`<li><b>Surge agent</b>${st.s.toLowerCase()}; ${S.arr[S.arr.length-1]} arrivals last hour.</li>
+<li><b>Bed agent</b>ED ${wait?"over capacity by "+wait:"has "+(ed.cap-ed.occ)+" free beds"}; ward has ${S.ward.cap-S.ward.occ} free.</li>
+<li><b>Staff agent</b>ED needs ${rE} nurses and has ${S.n.ed}; ward needs ${rW} and has ${S.n.ward}.</li>
+<li><b>Equipment agent</b>${S.vent.t-S.vent.u} ventilators and ${S.or.t-S.or.u} operating rooms free.</li>
+<li><b>Verifier</b>${S.plans.length?S.plans.filter(p=>p.safe).length+" of 3 plans safe.":"waiting for plans."}</li>`;
+$("pls").innerHTML=S.plans.length?S.plans.map((p,i)=>`<article class="c pl ${p.rec?"rec":""}">
+<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">${p.nm}</h2><span class="badge ${p.safe?"ok":"bad"}">${p.safe?(p.rec?"Safe, recommended":"Safe"):"Rejected"}</span></div>
+<ul><li>Move ${p.adm} ED patients to ward</li><li>Discharge ${p.dis} ward patients early</li><li>Float ${p.fE} nurses to ED, ${p.fW} to ward</li></ul>
+<div class="met"><div><b>${p.avg.toFixed(1)}</b>avg boarding</div><div><b>${p.peak.toFixed(1)}</b>peak boarding</div><div><b>${p.fat}</b>nurse strain</div></div>
+${p.ck.map(c=>`<div class="chk ${c[1]?"ok":"bad"}">${c[1]?"Pass":"Fail"}: ${c[0]} (${c[2]})</div>`).join("")}
+<div style="margin-top:10px"><button class="p" ${p.safe?"":"disabled"} onclick="apply(${i})">Approve plan</button> <button onclick="rej(${i})">Reject</button></div></article>`).join(""):`<p class="sub">No plans yet. Trigger a surge or draft plans to begin.</p>`;
+$("log").innerHTML=S.log.map(l=>`<div>${l}</div>`).join("")||"Nothing logged yet."}
+function rej(i){log("Duty manager rejected the "+S.plans[i].nm+" plan.");S.plans.splice(i,1);render()}
+$("sz").oninput=e=>$("szv").textContent=e.target.value;
+$("nx").onclick=()=>{S.h++;const l=S.arr[S.arr.length-1],a=$("rise").checked?Math.min(14,l+3):2+Math.floor(Math.random()*4);
+S.arr.push(a);S.ed.occ=Math.max(0,S.ed.occ+a-5+(a<6?1:0));S.ward.occ=Math.max(20,Math.min(S.ward.cap-1,S.ward.occ+Math.floor(Math.random()*3)-1));
+const s=getStatus();log("Hour advanced: "+a+" arrivals. Surge agent reads "+s.s.toLowerCase()+".");if(s.s!=="Normal")draft();else render()};
+$("sg").onclick=()=>{const n=+$("sz").value;S.arr.push(n);S.ed.occ+=n;log("Surge agent: "+n+" emergency arrivals.");draft()};
+$("gp").onclick=draft;
+$("rs").onclick=()=>{S=init();render()};
+render();
+</script></body></html>
